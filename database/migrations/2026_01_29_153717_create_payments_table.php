@@ -9,13 +9,14 @@ return new class extends Migration {
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')->constrained()->cascadeOnDelete();
-            $table->string('gateway', 50);                 
-            $table->string('reference')->nullable()->index(); 
+            $table->foreignId('order_id')->constrained('orders')->restrictOnDelete();
+            $table->string('gateway', 50);
+            $table->string('reference')->nullable()->index();
             $table->string('status', 30)->default('pending');
             $table->decimal('amount', 10, 2);
+            $table->string('currency', 3)->default('SAR');
             $table->text('payment_url')->nullable();
-            $table->json('raw')->nullable();               
+            $table->json('raw')->nullable();
             $table->timestamps();
         });
     }

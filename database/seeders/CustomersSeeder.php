@@ -11,19 +11,19 @@ class CustomersSeeder extends Seeder
     {
         $customers = [
             [
-                'name' => 'Alaa Abd El-Hakam',
+                'name' => 'Alaa Abd ElHakam',
                 'email' => 'alaa@example.com',
-                'mobile' => '201234567890',
+                'mobile' => '51234567',
             ],
             [
                 'name' => 'Ahmed Hassan',
                 'email' => 'ahmed@example.com',
-                'mobile' => '201111111111',
+                'mobile' => '51214567',
             ],
             [
                 'name' => 'Sara Mohamed',
                 'email' => 'sara@example.com',
-                'mobile' => '201222222222',
+                'mobile' => '51284567',
             ],
         ];
 

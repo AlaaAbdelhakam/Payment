@@ -15,7 +15,9 @@ return new class extends Migration {
             $table->decimal('unit_price', 10, 2);
             $table->decimal('line_total', 10, 2);
             $table->timestamps();
+            $table->softDeletes();
         });
+
     }
 
     public function down(): void

@@ -2,11 +2,8 @@
 
 namespace App\Services\Checkout;
 
-use App\Models\Customer;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Payment;
-use App\Models\Product;
 use App\Services\Payments\PaymentService;
 use Illuminate\Support\Facades\DB;
 
@@ -22,68 +19,55 @@ class CheckoutService
 
         return DB::transaction(function () use ($data, $gateway) {
 
-            $customer = Customer::findOrFail($data['customer_id']);
+            $order = Order::with(['customer', 'items.product'])->findOrFail($data['order_id']);
 
-            $order = Order::create([
-                'customer_id' => $customer->id,
-                'status' => 'pending',
-                'total' => 0,
-            ]);
-
-            $productIds = collect($data['items'])->pluck('product_id')->unique()->values()->all();
-
-            $products = Product::query()
-                ->whereIn('id', $productIds)
-                ->where('is_active', true)
-                ->get()
-                ->keyBy('id');
-
-            $total = 0;
-
-            foreach ($data['items'] as $item) {
-                $product = $products->get($item['product_id']);
-
-                if (! $product) {
-                    abort(422, "Product {$item['product_id']} is not available.");
-                }
-
-                $qty = (int) $item['qty'];
-                $unit = (float) $product->price;
-                $line = $unit * $qty;
-
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $product->id,
-                    'qty' => $qty,
-                    'unit_price' => $unit,
-                    'line_total' => $line,
-                ]);
-
-                $total += $line;
+            if ($order->items->isEmpty()) {
+                abort(422, 'Order has no items.');
             }
 
-            $order->update(['total' => $total]);
+            if ((float) $order->total <= 0) {
+                abort(422, 'Order total must be greater than 0.');
+            }
+
+            if ($order->status === 'paid') {
+                abort(422, 'Order is already paid.');
+            }
+
+            $customer = $order->customer;
+
+            $currency = strtoupper((string) ($data['currency'] ?? $order->currency ?? config('payments.currency', 'SAR')));
 
             $payment = Payment::create([
-                'order_id' => $order->id,
-                'gateway' => $gateway,
-                'amount' => $total,
-                'status' => 'pending',
+                'order_id'  => $order->id,
+                'gateway'   => $gateway,
+                'amount'    => (float) $order->total,
+                'currency'  => $currency,
+                'status'    => 'pending',
             ]);
 
-            $createResult = $this->payments->create($gateway, [
-                'amount' => $total,
+            $payload = [
+                'order_id'   => $order->id,
+                'payment_id' => $payment->id,
+                'amount' => (float) $order->total,
+                'currency' => $currency,
                 'customer_name' => $customer->name,
                 'customer_email' => $customer->email,
                 'customer_mobile' => $customer->mobile,
-                'success_url' => url("/api/v1/payments/callback?gateway={$gateway}&order_id={$order->id}&payment_id={$payment->id}"),
-                'failure_url' => url("/api/v1/payments/callback?gateway={$gateway}&order_id={$order->id}&payment_id={$payment->id}"),
-            ]);
+                'success_url' => url("/api/payments/callback?gateway={$gateway}&payment_id={$payment->id}"),
+                'failure_url' => url("/api/payments/callback?gateway={$gateway}&payment_id={$payment->id}"),
+            ];
+
+            if (! empty($order->payment_method_id)) {
+                $payload['payment_method_id'] = (int) $order->payment_method_id;
+            }
+
+            $createResult = $this->payments->create($gateway, $payload);
 
             $payment->update([
-                'reference' => $createResult['reference'] ?? null,
+                'reference'   => $createResult['reference'] ?? null,  
                 'payment_url' => $createResult['payment_url'] ?? null,
-                'raw' => $createResult['raw'] ?? null,
+                'raw'         => $createResult['raw'] ?? null,
+                'currency'    => $createResult['currency'] ?? $payment->currency,
             ]);
 
             $payment->refresh();
@@ -92,26 +76,16 @@ class CheckoutService
                 abort(422, 'Payment gateway did not return a payment_url.');
             }
 
-            // NOTE:
-            // We do NOT call status() immediately here.
-            // Most gateways will be "pending" until the customer pays at payment_url.
-            // You should update payment/order status in callback/webhook.
+            if ($order->status !== 'pending') {
+                $order->update(['status' => 'pending']);
+            }
 
             return [
-                'customer' => [
-                    'id' => $customer->id,
-                    'name' => $customer->name,
-                    'email' => $customer->email,
-                    'mobile' => $customer->mobile,
-                ],
-                'order' => Order::with('items.product')->find($order->id),
+                'order' => $order->fresh()->load('items.product', 'customer'),
                 'payment' => $payment,
                 'reference' => $payment->reference,
                 'payment_url' => $payment->payment_url,
-                'gateway' => [
-                    'name' => $gateway,
-                    'create_response' => $createResult,
-                ],
+                'gateway' => $gateway,
                 'final_status' => $payment->status,
             ];
         });
