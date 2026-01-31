@@ -17,5 +17,5 @@ return [
         'api_key' => env('MYFATOORAH_API_KEY', 'SK_KWT_vVZlnnAqu8jRByOWaRPNId4ShzEDNt256dvnjebuyzo52dXjAfRx2ixW5umjWSUx'),
         'is_test' => env('MYFATOORAH_IS_TEST', true),
     ],
-    // test card myfatoorah 5123450000000008-01/39-100
+    // test card myfatoorah Mada 4464040000000007-02/29-123
 ];

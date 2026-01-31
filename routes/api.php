@@ -26,7 +26,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::post('login', [AuthController::class, 'login']);
 
-Route::any('payments/callback', PaymentsCallbackController::class); // can i say here it is just in case needed not in myfatoorah case
+Route::any('payments/callback', PaymentsCallbackController::class);
 
 
 Route::middleware('auth:sanctum')->group(function () {
