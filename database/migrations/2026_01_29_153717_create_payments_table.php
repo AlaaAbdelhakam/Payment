@@ -18,6 +18,8 @@ return new class extends Migration {
             $table->text('payment_url')->nullable();
             $table->json('raw')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
         });
     }
 
